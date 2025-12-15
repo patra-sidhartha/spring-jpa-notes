@@ -1,0 +1,329 @@
+# spring-jpa-notes
+Spring JPA
+
+
+ one-to-many relationship between Department and Employee entities in Spring JPA
+==================================================================================
+ 1. The Employee Entity (Many Side - Owning Side)
+ ------------------------------------------------
+ The Employee entity is the owning side of this relationship because its table (EMPLOYEES) will physically hold the foreign key column (department_id).
+ 
+ Employee.java
+ ----------------
+ package com.example.model;
+
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "employees")
+public class Employee {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String firstName;
+    private String lastName;
+
+    // This is the owning side of the many-to-one relationship
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id", nullable = false) // Foreign key column in the 'employees' table
+    private Department department;
+
+    // Standard Getters and Setters (omitted for brevity)
+    // ...
+}
+
+2. The Department Entity (One Side - Inverse Side)
+---------------------------------------------------
+The Department entity is the inverse side. It defines the relationship using mappedBy to indicate that the Employee entity manages the physical mapping, preventing the creation of redundant foreign key columns.
+
+Department.java
+----------------
+package com.example.model;
+
+import jakarta.persistence.*;
+import java.util.HashSet;
+import java.util.Set;
+
+@Entity
+@Table(name = "departments")
+public class Department {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+
+    // This is the inverse side, mapped by the 'department' field in the Employee class
+    @OneToMany(mappedBy = "department", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<Employee> employees = new HashSet<>();
+
+    // Helper method to manage the bidirectional relationship cleanly
+    public void addEmployee(Employee employee) {
+        employees.add(employee);
+        employee.setDepartment(this);
+    }
+    
+    // Standard Getters and Setters (omitted for brevity)
+    // ...
+}
+
+cascade = CascadeType.ALL: If you delete a department, all associated employees are also deleted (depending on your business rules, you might want different cascade types or manual handling).
+
+EmployeeRepository.java
+------------------------
+@Repository
+public interface EmployeeRepository extends JpaRepository<Employee, Long> {
+    
+    // Custom finder method: finds all employees associated with a specific department ID
+    // Spring translates this into: SELECT * FROM employees WHERE department_id = ?
+    List<Employee> findByDepartmentId(Long departmentId);
+
+    // Custom finder method using property path navigation
+    // Finds employees whose department name matches the input string
+    List<Employee> findByDepartmentName(String departmentName);
+}
+
+DepartmentRepository .java
+---------------------------
+@Repository
+public interface DepartmentRepository extends JpaRepository<Department, Long> {
+    // Custom finder method based on the 'name' field in the Department entity
+    Department findByName(String name);
+}
+
+
+The Two Types of Fetching:
+JPA defines two primary fetch types: LAZY and EAGER.
+1. FetchType.LAZY (The Default for Collections)
+------------------------------------------------
+Behavior:
+When you use FetchType.LAZY, the primary entity (e.g., a Department) is loaded immediately, but a proxy or placeholder for the related collection (e.g., the list of Employees) is put in its place.
+The actual SQL query to fetch the Employee data runs only at the moment you call a getter method on that collection.
+
+Example from previous code:
+@OneToMany(mappedBy = "department", fetch = FetchType.LAZY)
+private Set<Employee> employees;
+
+What happens at runtime:
+// 1. A single SELECT query runs to get department details
+Department dept = departmentRepository.findById(1L).orElse(null);
+
+// At this point, the 'employees' set is an empty proxy/placeholder. 
+// No employee data has been loaded from the DB yet.
+
+// 2. The data is accessed for the first time
+// A SECOND SELECT query is automatically executed by JPA here
+int numberOfEmployees = dept.getEmployees().size(); 
+
+Pros:
+Performance: Prevents loading unnecessary data when a simple list of departments is needed.
+Reduced memory usage: Only loads data needed for the immediate task.
+
+
+2. FetchType.EAGER
+--------------------
+Behavior:
+The related data is loaded immediately along with the primary entity. This usually results in a single, more complex SQL query (often using a JOIN clause).
+
+Behavior:
+The related data is loaded immediately along with the primary entity. This usually results in a single, more complex SQL query (often using a JOIN clause).
+Example:
+@ManyToOne(fetch = FetchType.EAGER) // EAGER is the default for ManyToOne/OneToOne
+private Department department;
+
+Pros:
+Guarantees all data is available instantly.
+Avoids LazyInitializationException.
+
+one=to-one
+===============
+A one-to-one relationship in Spring JPA connects two entities such that exactly one instance of Entity A maps to exactly one instance of Entity B. This is commonly implemented using a shared primary key or, more often, a foreign key defined on one of the tables.
+
+1. The Owning Side: UserPreference
+----------------------------------
+package com.example.model;
+
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "user_preferences")
+public class UserPreference {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private boolean receiveNewsletter;
+    private String preferredTheme;
+
+    // This defines the Foreign Key in the 'user_preferences' table
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", referencedColumnName = "id")
+    private User user;
+
+    // Getters and Setters (omitted for brevity)
+    // ...
+}
+
+
+2. The Inverse Side: User
+---------------------------
+package com.example.model;
+
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "users")
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String username;
+    private String email;
+
+    // The 'user' here refers to the field name in the UserPreference entity
+    @OneToOne(fetch = FetchType.LAZY, mappedBy = "user", cascade = CascadeType.ALL)
+    private UserPreference userPreference;
+
+    // Helper method for bidirectional sync
+    public void setUserPreference(UserPreference preference) {
+        if (preference == null) {
+            if (this.userPreference != null) {
+                this.userPreference.setUser(null);
+            }
+        }
+        else {
+            preference.setUser(this);
+        }
+        this.userPreference = preference;
+    }
+
+    // Getters and Setters (omitted for brevity)
+    // ...
+}
+
+UserRepository .java
+----------------------
+@Repository
+public interface UserRepository extends JpaRepository<User, Long> {
+    // Custom finder method
+    Optional<User> findByUsername(String username);
+}
+
+UserPreferenceRepository .java
+----------------------------------
+@Repository
+public interface UserPreferenceRepository extends JpaRepository<UserPreference, Long> {
+    // Custom finder method to find a preference by its associated user's ID
+    Optional<UserPreference> findByUserId(Long userId);
+}
+
+Dealing with many-to-many relationships in Spring JPA 
+==========================================================
+A classic many-to-many relationship involves Users having multiple Roles (e.g., ADMIN, USER, MODERATOR), and each Role being assigned to many Users.
+
+1. The Owning Side (User Entity)
+-----------------------------------
+One side of the relationship must be designated the "owning side." This entity defines how the intermediate join table is created. We use the @JoinTable annotation here.
+
+
+package com.example.model;
+
+import jakarta.persistence.*;
+import java.util.HashSet;
+import java.util.Set;
+
+@Entity
+@Table(name = "users")
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String username;
+
+    @ManyToMany(fetch = FetchType.LAZY, cascade = CascadeType.PERSIST)
+    @JoinTable(
+        name = "user_roles", // Name of the intermediate table created in the DB
+        joinColumns = @JoinColumn(name = "user_id"), // Column in 'user_roles' referencing 'users'
+        inverseJoinColumns = @JoinColumn(name = "role_id") // Column in 'user_roles' referencing 'roles'
+    )
+    private Set<Role> roles = new HashSet<>();
+
+    // Getters, setters, constructors...
+}
+
+
+2. The Inverse Side (Role Entity)
+--------------------------------
+package com.example.model;
+
+import jakarta.persistence.*;
+import java.util.HashSet;
+import java.util.Set;
+
+@Entity
+@Table(name = "roles")
+public class Role {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    @Enumerated(EnumType.STRING)
+    private ERole name; // ERole is typically an enum (ROLE_USER, ROLE_ADMIN)
+
+    // 'roles' here refers to the private Set<Role> field name in the User entity
+    @ManyToMany(mappedBy = "roles", fetch = FetchType.LAZY)
+    private Set<User> users = new HashSet<>();
+
+    // Getters, setters, constructors...
+}
+
+Composite Key
+----------
+Here is the concrete example for handling composite keys using @Embeddable and @EmbeddedId. We are mapping a ProductRating entity where the key is composed of customerId and productId, and we also store a rating_date in the join table.
+
+package com.example.model;
+
+import jakarta.persistence.Embeddable;
+import java.io.Serializable;
+import java.util.Objects;
+
+@Embeddable
+public class ProductRatingId implements Serializable {
+
+    private Long customerId;
+    private Long productId;
+
+    // No-arg constructor required by JPA
+    public ProductRatingId() {}
+
+    public ProductRatingId(Long customerId, Long productId) {
+        this.customerId = customerId;
+        this.productId = productId;
+    }
+
+    // Getters/Setters (omitted for brevity)
+
+    // *** CRITICAL: Must implement equals() and hashCode() ***
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ProductRatingId that = (ProductRatingId) o;
+        return Objects.equals(customerId, that.customerId) &&
+               Objects.equals(productId, that.productId);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(customerId, productId);
+    }
+}
