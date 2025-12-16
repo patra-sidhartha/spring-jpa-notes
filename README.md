@@ -4,13 +4,13 @@ Spring JPA
 **cascade types**
 In Spring JPA, cascade types are used to propagate state transitions (like persist, merge, or remove) from a parent entity to its associated child entities automatically. The javax.persistence.CascadeType enum defines the available types. By default, no operations are cascaded. 
 
-The standard JPA cascade types are: 
-**CascadeType.PERSIST**: When you save (persist) a parent entity, all associated new child entities are automatically saved to the database. This is useful when creating a new entity graph (e.g., a new Author with new Book objects). 
-**CascadeType.MERGE:** When you merge (update) a detached parent entity back into the persistence context, changes to its associated child entities are also merged into the database. 
-**CascadeType.REMOVE:** When you delete (remove) a parent entity, all its related child entities are automatically deleted from the database. This is typically used in parent-child relationships where the child cannot exist without the parent (e.g., an Order and its OrderItems). 
-**CascadeType.REFRESH:** When you refresh a parent entity's state from the database (undoing any changes not yet flushed), all associated child entities are also refreshed to reflect the latest database state. 
-**CascadeType.DETACH**: When you manually detach a parent entity from the persistence context (the entity manager stops tracking changes), all associated child entities are also detached. 
-**CascadeType.ALL:** This is a convenience type that applies all of the above operations (PERSIST, MERGE, REMOVE, REFRESH, DETACH) to the associated entities. It should be used cautiously, typically only when the child entity's lifecycle is entirely dependent on the parent. 
+The standard JPA cascade types are: <br>
+**CascadeType.PERSIST**: When you save (persist) a parent entity, all associated new child entities are automatically saved to the database. This is useful when creating a new entity graph (e.g., a new Author with new Book objects). <br>
+**CascadeType.MERGE:** When you merge (update) a detached parent entity back into the persistence context, changes to its associated child entities are also merged into the database. <br>
+**CascadeType.REMOVE:** When you delete (remove) a parent entity, all its related child entities are automatically deleted from the database. This is typically used in parent-child relationships where the child cannot exist without the parent (e.g., an Order and its OrderItems). <br>
+**CascadeType.REFRESH:** When you refresh a parent entity's state from the database (undoing any changes not yet flushed), all associated child entities are also refreshed to reflect the latest database state. <br>
+**CascadeType.DETACH**: When you manually detach a parent entity from the persistence context (the entity manager stops tracking changes), all associated child entities are also detached. <br>
+**CascadeType.ALL:** This is a convenience type that applies all of the above operations (PERSIST, MERGE, REMOVE, REFRESH, DETACH) to the associated entities. It should be used cautiously, typically only when the child entity's lifecycle is entirely dependent on the parent. <br>
 
 ---
 import javax.persistence.*;
