@@ -29,6 +29,20 @@ public class ParentEntity {
     // ... getters and setters ...
 }
 ---
+
+**GenerationType**
+The GenerationType enum in the Java Persistence API (JPA) defines four standard strategies for generating primary key values for entities.<br/> 
+Here are the different types of GenerationType: <br/>
+
+- GenerationType.IDENTITY: This strategy relies on an auto-incremented column in the database.
+  -- How it works: The database automatically generates a unique value when a new row is inserted. JPA retrieves this generated ID after the INSERT operation completes.
+- GenerationType.SEQUENCE: This strategy uses a database sequence object to generate unique values.
+   -- How it works: JPA first requests the next value from the database sequence and then uses that value to perform the INSERT operation for the entity.
+- GenerationType.TABLE: This strategy uses a separate database table to simulate a sequence.
+   -- How it works: A dedicated table stores and updates the current identifier value, typically using pessimistic locks to ensure synchronization across transactions.
+- GenerationType.AUTO: This is the default strategy if no strategy is specified.
+   -- How it works: The persistence provider (e.g., Hibernate) automatically selects the most appropriate generation strategy based on the specific database dialect being used. It typically defaults to SEQUENCE for most popular databases if available, or IDENTITY if not.
+
 many-to-one relationship from Employee to Department
 ====================================================
 **1. The Employee Entity (Employee.java)**
