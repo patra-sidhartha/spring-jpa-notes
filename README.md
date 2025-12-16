@@ -2,8 +2,7 @@
 Spring JPA
 many-to-one relationship from Employee to Department
 ====================================================
-1. The Employee Entity (Employee.java)
---------------------------------------
+**1. The Employee Entity (Employee.java)**
 This entity represents the EMP table and is the "many" side, holding a reference to the Department entity
 
 package com.example.model;
@@ -36,8 +35,7 @@ public class Employee {
     }
 }
 
-2. The Department Entity (Department.java)
-------------------------------------------------
+**2. The Department Entity (Department.java)**
 This entity represents the DEPT table and is the "one" side of the relationship
 
 package com.example.model;
