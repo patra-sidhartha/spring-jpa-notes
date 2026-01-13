@@ -1,0 +1,210 @@
+1. What is JPQL ?
+    - JPQL (Java Persistence Query Language) is a platform-independent, object-oriented query language used in Java applications to perform database operations. 
+    - While it looks very similar to SQL, the critical difference is that JPQL operates on Java entity objects and their attributes rather than directly on database tables and columns.
+
+    @Repository
+    public interface UserRepository extends JpaRepository<User, Long> {
+        // Example JPQL finding users by email
+        @Query("SELECT u FROM User u WHERE u.email = :email")
+        User findByEmail(@Param("email") String email);
+    }
+    Key Characteristics:
+        - Object-Oriented: You write queries against your Java classes (Entities). For example, instead of SELECT * FROM users, you write SELECT u FROM User u.
+        - Database Agnostic: JPQL is portable across different database systems (MySQL, Oracle, PostgreSQL, etc.) because the JPA provider (like Hibernate) translates your JPQL into the specific SQL dialect of the underlying database.
+        - Strongly Typed: It supports typed queries, meaning many errors can be caught at compile-time or early in the development process.
+        - Simplified Syntax: It abstracts away complex joins by allowing you to navigate entity relationships using "dot" notation (e.g., u.address.city).
+
+    Supported Clauses:
+        - JPQL supports almost all standard SQL clauses, including SELECT, UPDATE, DELETE, WHERE, GROUP BY, HAVING, and ORDER BY. It also includes aggregate functions like COUNT, SUM, AVG, MIN, and MAX
+    When to Use ?
+        - Fetching a user by multiple conditional attributes where a method name would be 50 characters long. 
+        - Use JPQL if your application needs to support multiple database types (e.g., PostgreSQL for production and H2 for testing).
+        - When you need to perform joins or filter data based on your Java Entity structure rather than raw database tables.
+            Joins: You can navigate relationships easily using dot notation (e.g., SELECT u FROM User u JOIN u.roles r WHERE r.name = 'ADMIN').
+        - Note: While JPQL handles these efficiently, remember that these bulk operations bypass the persistence context (cache), so your managed entities might not reflect the changes immediately. 
+2. What is the diff between JPARepository and CrudRepository?
+    - JpaRepository is the standard for most JPA-based applications due to its comprehensive features, while CrudRepository remains the choice for simpler, persistence-agnostic needs.
+    - CrudRepository: Base interface extending the Repository marker interface.
+        - Methods like findAll() return an Iterable<T>.
+        - Supports only basic individual operations (e.g., save, delete).
+        - Changes are synchronized with the database when the transaction ends.
+        - Persistence-agnostic: Designed to work with various data stores beyond JPA (e.g., MongoDB, Cassandra).
+    - JpaRepository: Extends both PagingAndSortingRepository and CrudRepository. 
+        - Methods like findAll() return a List<T>, making it more flexible for immediate processing.
+        - Provides batch support with methods like deleteInBatch() and saveAllAndFlush().
+        - Provides flush() and saveAndFlush() to push changes to the database immediately.
+        - JPA-specific: Deeply tied to Java Persistence API technologies like Hibernate.
+    When to Use Which?
+        Use CrudRepository if:
+            -You only need basic Create, Read, Update, and Delete functions.
+            - You want to keep your code general and potentially compatible with non-JPA data sources.
+        Use JpaRepository if:
+            - You require pagination and sorting out of the box (via its inheritance of PagingAndSortingRepository).
+            - You need to perform batch deletions to improve performance on large datasets.
+            -  You need fine-grained control over when the persistence context flushes to the database. 
+3. How to work with PagingAndSortingRepository?
+    Create an interface that extends PagingAndSortingRepository. Note that JpaRepository already extends this, so if you're using JPA, you get these features automatically.
+        @Repository
+        public interface ProductRepository extends PagingAndSortingRepository<Product, Long> {
+            // You can also add custom query methods that support pagination
+            Page<Product> findByCategory(String category, Pageable pageable);
+        }
+
+        @Service
+        public class ProductService {
+            @Autowired
+            private ProductRepository repository;
+
+            public Page<Product> getProducts(int page, int size) {
+                Pageable pageable = PageRequest.of(page, size, Sort.by("name"));
+                return repository.findAll(pageable);
+            }
+        }
+    Handling Results: 
+        The Page<T> object provides several useful methods to inspect the results: 
+           - getContent(): Returns the List<T> of items for the current page.
+           - getTotalPages(): Returns the total number of pages available.
+           - getTotalElements(): Returns the total number of records in the database that match the query.
+           - hasNext(): Returns a boolean indicating if there is a subsequent page.
+    Performance Tip: Page vs. Slice: 
+        - Page<T>: Executes a "count" query to know the total number of pages. Use this when the UI needs to show specific page numbers.
+        - Slice<T>: Does not execute a count query; it only knows if a "next" page exists. Use this for infinite scrolling or "Load More" buttons to improve performance on very large datasets.
+    Packages:
+        Component	            Package
+        JpaRepository	        org.springframework.data.jpa.repository
+        Pageable	            org.springframework.data.domain
+        Sort	                org.springframework.data.domain
+        Page	                org.springframework.data.domain
+        PagingAndSortingRepository	org.springframework.data.repository
+4. The Repository Hierarchy
+    The Hierarchy
+        To visualize how they are connected:
+            1. Repository (The root marker interface)
+            2. CrudRepository (Adds basic CRUD: save, delete, findById)
+            3. PagingAndSortingRepository (Adds findAll(Sort) and findAll(Pageable))
+            4. ListPagingAndSortingRepository (Newer in Spring Data 3.x, returns List instead of Iterable)
+            5. JpaRepository (The "everything" interface: Adds JPA-specifics like flush, deleteInBatch, and returns List)
+5. How to use Sort and Order by in JPA syntax ?
+    1. Automatic Method Names (Query Derivation)
+        public interface UserRepository extends JpaRepository<User, Long> {
+            // Finds users by status and sorts by name ascending
+            List<User> findByStatusOrderByNameAsc(String status);
+
+            // Finds all users sorted by age descending
+            List<User> findAllByOrderByAgeDesc();
+        }
+    2. The Dynamic Sort Object (Recommended)
+        // Just add a Sort parameter to any query method
+        List<User> findByLastName(String lastName, Sort sort);
+        In your Service:
+            import org.springframework.data.domain.Sort;
+            // Single field
+            Sort nameSort = Sort.by("firstName").ascending();
+            // Multiple fields
+            Sort complexSort = Sort.by("department").descending()
+                                .and(Sort.by("salary").ascending());
+            List<User> users = userRepository.findByLastName("Smith", complexSort);
+    3. JPQL Syntax (The @Query Annotation)
+        @Query("SELECT u FROM User u WHERE u.active = true ORDER BY u.registrationDate DESC")
+        List<User> findActiveUsersSorted();
+    4. Combining with Pagination
+        import org.springframework.data.domain.PageRequest;
+        import org.springframework.data.domain.Pageable;
+
+        Pageable pageable = PageRequest.of(0, 10, Sort.by("email").ascending());
+        Page<User> userPage = userRepository.findAll(pageable);
+6. Query to find By name and dept and doing date from from to and name desc.
+    1. Option 1: Query Derivation (The "No-Code" Way): 
+        public interface EmployeeRepository extends JpaRepository<Employee, Long> {
+            List<Employee> findByNameAndDeptAndJoiningDateBetweenOrderByNameDesc(
+                String name, 
+                String dept, 
+                LocalDate from, 
+                LocalDate to
+            );
+        }
+    Option 2: JPQL with @Query (The Precise Way)
+        @Query("SELECT e FROM Employee e " +
+       "WHERE e.name = :name " +
+       "AND e.dept = :dept " +
+       "AND e.joiningDate >= :fromDate " +
+       "AND e.joiningDate <= :toDate " +
+       "ORDER BY e.name DESC")
+        List<Employee> searchEmployees(
+            @Param("name") String name, 
+            @Param("dept") String dept, 
+            @Param("fromDate") LocalDate fromDate, 
+            @Param("toDate") LocalDate toDate
+        );
+    Pro-Tip for 2026: Dynamic Sorting:
+        If you want to be able to change the sort order later without changing the query, use a Sort parameter:
+        // Method
+        List<Employee> findByNameAndDeptAndJoiningDateBetween(String name, String dept, LocalDate from, LocalDate to, Sort sort);
+
+        // Calling it in Service
+        repo.findByNameAndDeptAndJoiningDateBetween(name, dept, from, to, Sort.by("name").descending());
+7. What is Named Query ?
+    In Spring Boot and JPA, a Named Query is a predefined, static query that is associated with a specific entity. 
+    1. How to Define a Named Query
+    You use the @NamedQuery annotation on top of your Entity class.
+        @Entity
+        @NamedQuery(
+            name = "User.findByStatus",
+            query = "SELECT u FROM User u WHERE u.status = :status ORDER BY u.name ASC"
+        )
+        public class User {
+            @Id
+            private Long id;
+            private String name;
+            private String status;
+        }
+    2. How to Use It in a Repository:
+        @Repository
+        public interface UserRepository extends JpaRepository<User, Long> {
+            // Spring looks for a Named Query called "User.findByStatus"
+            List<User> findByStatus(@Param("status") String status);
+        }
+8. What is native Query?
+    @Entity
+    @NamedNativeQuery(
+        name = "Employee.findRawBonus",
+        query = "SELECT e.id, (e.salary * 0.1) as bonus FROM tbl_employees e WHERE e.dept = :dept",
+        resultClass = Employee.class // Maps the result back to an entity
+    )
+    public class Employee { ... }
+
+    use:
+    @Repository
+    public interface EmployeeRepository extends JpaRepository<Employee, Long> {
+        // Automatically looks for "Employee.findRawBonus"
+        List<Object[]> findRawBonus(@Param("dept") String dept);
+    }
+9. Diff between Named Query (JPQL) and Native Query (SQL)
+    1. Named Query (JPQL)
+        - A Named Query uses JPQL (Java Persistence Query Language). It is defined using the @NamedQuery annotation and targets your Java Entities, not database tables.
+        - Portability: Highly portable. You can switch your database from MySQL to PostgreSQL without changing a single line of query code because Hibernate translates the JPQL for you.
+        - Syntax: Uses Java class and field names.
+            Example: SELECT u FROM User u WHERE u.firstName = :name
+    2. Native Query (SQL)
+        - A Native Query uses Standard SQL. It can be defined via @NamedNativeQuery or directly in a repository using @Query(nativeQuery = true). It targets Database Tables and columns directly.
+        - Portability: Low. If you use a database-specific feature (like a Postgres JSON operator or a specific Oracle hint), your query will break if you switch databases.
+        - Syntax: Uses raw table and column names.
+            Example: SELECT * FROM users_table WHERE first_name = :name
+    Which to use in 2026?
+        - Use Named Query for 90% of your business logic to keep your code clean and database-independent.
+        - Use Native Query only when you need to perform high-performance reporting, use specialized database functions, or work with a legacy database schema that doesn't map perfectly to your entities.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
